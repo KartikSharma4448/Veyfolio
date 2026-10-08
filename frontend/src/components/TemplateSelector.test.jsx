@@ -1,5 +1,5 @@
 import { createRoot } from 'react-dom/client';
-import { act } from 'react-dom/test-utils';
+import { act } from 'react';
 import TemplateSelector, { TEMPLATES } from './TemplateSelector';
 
 let container = null;
@@ -21,10 +21,10 @@ afterEach(() => {
 });
 
 describe('TemplateSelector', () => {
-  it('defines all six templates with id, name, and description', () => {
-    expect(TEMPLATES).toHaveLength(6);
+  it('defines the two supported resume templates', () => {
+    expect(TEMPLATES).toHaveLength(2);
     const ids = TEMPLATES.map((t) => t.id);
-    expect(ids).toEqual(['modern', 'traditional', 'creative', 'minimalist', 'executive', 'tech']);
+    expect(ids).toEqual(['modern', 'clean']);
     TEMPLATES.forEach((t) => {
       expect(t.id).toBeTruthy();
       expect(t.name).toBeTruthy();
@@ -32,7 +32,7 @@ describe('TemplateSelector', () => {
     });
   });
 
-  it('renders all six template cards with name and description', () => {
+  it('renders both templates as keyboard-accessible buttons', () => {
     act(() => {
       root.render(<TemplateSelector selected="modern" onSelect={() => {}} />);
     });
@@ -40,24 +40,16 @@ describe('TemplateSelector', () => {
       expect(container.textContent).toContain(t.name);
       expect(container.textContent).toContain(t.description);
     });
+    expect(container.querySelectorAll('button')).toHaveLength(2);
   });
 
-  it('shows visual distinction for the selected template', () => {
+  it('announces the selected template', () => {
     act(() => {
-      root.render(<TemplateSelector selected="creative" onSelect={() => {}} />);
+      root.render(<TemplateSelector selected="clean" onSelect={() => {}} />);
     });
-    const cards = container.querySelectorAll('[class*="cursor-pointer"]');
-    expect(cards).toHaveLength(6);
-
-    // The selected card (creative is index 2) should have the ring class
-    const selectedCard = cards[2];
-    expect(selectedCard.className).toContain('ring-2');
-    expect(selectedCard.className).toContain('border-[#0066ff]');
-
-    // Non-selected cards should not have the ring class
-    const nonSelectedCard = cards[0];
-    expect(nonSelectedCard.className).not.toContain('ring-2');
-    expect(nonSelectedCard.className).toContain('border-gray-700');
+    const buttons = container.querySelectorAll('button');
+    expect(buttons[0].getAttribute('aria-pressed')).toBe('false');
+    expect(buttons[1].getAttribute('aria-pressed')).toBe('true');
   });
 
   it('calls onSelect with the template id when a card is clicked', () => {
@@ -65,11 +57,11 @@ describe('TemplateSelector', () => {
     act(() => {
       root.render(<TemplateSelector selected="modern" onSelect={onSelect} />);
     });
-    const cards = container.querySelectorAll('[class*="cursor-pointer"]');
+    const cards = container.querySelectorAll('button');
 
     act(() => {
-      cards[3].click(); // minimalist
+      cards[1].click();
     });
-    expect(onSelect).toHaveBeenCalledWith('minimalist');
+    expect(onSelect).toHaveBeenCalledWith('clean');
   });
 });

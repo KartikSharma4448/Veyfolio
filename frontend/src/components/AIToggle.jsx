@@ -22,13 +22,14 @@ const AIToggle = ({ enabled, onToggle }) => {
   };
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2 text-gray-300 shrink-0">
       <Switch
         id="ai-toggle"
         checked={enabled}
         onCheckedChange={handleChange}
+        className="data-[state=checked]:bg-[#0066ff] data-[state=unchecked]:bg-gray-600"
       />
-      <Label htmlFor="ai-toggle">AI Refinement</Label>
+      <Label htmlFor="ai-toggle" className="text-xs whitespace-nowrap">AI Refinement</Label>
     </div>
   );
 };

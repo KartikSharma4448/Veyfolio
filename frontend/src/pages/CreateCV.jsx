@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -6,8 +6,9 @@ import { Textarea } from '../components/ui/textarea';
 import { Label } from '../components/ui/label';
 import { Card } from '../components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { FileText, Sparkles, Download, Plus, Trash2, ArrowLeft, Upload, X } from 'lucide-react';
-import { mockLinkedInData } from '../mock/mockData';
+import { Sparkles, Download, Plus, Trash2, ArrowLeft, Eye, PenLine } from 'lucide-react';
+import { loadResumeDraft, saveResumeDraft, resumeToText } from '../lib/resumeDraft';
+import { renderPdfProjects } from '../lib/pdfProjects';
 import api from '../lib/api';
 import { refineText, compilePDF } from '../lib/api';
 import CVPreview from '../components/CVPreview';
@@ -17,74 +18,38 @@ import AIToggle from '../components/AIToggle';
 import TemplateSelector from '../components/TemplateSelector';
 import { trackEvent } from '../lib/analytics';
 import SEOHead from '../components/SEOHead';
+import './CreateCV.css';
 
 const CreateCV = () => {
   const navigate = useNavigate();
-  const [cvData, setCvData] = useState(mockLinkedInData);
-  const [selectedTemplate, setSelectedTemplate] = useState('modern');
+  const [initialDraft] = useState(loadResumeDraft);
+  const [cvData, setCvData] = useState(initialDraft.cvData);
+  const [selectedTemplate, setSelectedTemplate] = useState(initialDraft.template);
+  const [saveStatus, setSaveStatus] = useState('Saving...');
+  useEffect(() => {
+    try {
+      saveResumeDraft(cvData, selectedTemplate);
+      setSaveStatus('Saved locally');
+    } catch {
+      setSaveStatus('Not saved');
+    }
+  }, [cvData, selectedTemplate]);
   const [showAISuggestions, setShowAISuggestions] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiSuggestion, setAiSuggestion] = useState('');
   const [atsScoreValue, setAtsScoreValue] = useState(null);
 
   const [activeTab, setActiveTab] = useState('personal');
+  const [editorView, setEditorView] = useState('edit');
   const [aiEnabled, setAiEnabled] = useState(true);
   const [refinedSections, setRefinedSections] = useState(new Set());
   const [pdfLoading, setPdfLoading] = useState(false);
-  const fileInputRef = useRef(null);
 
   const handlePersonalInfoChange = (field, value) => {
     setCvData(prev => ({
       ...prev,
       personalInfo: { ...prev.personalInfo, [field]: value }
     }));
-  };
-
-  const handleImageUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      // Validate file type
-      if (!file.type.startsWith('image/')) {
-        toast({
-          title: "Invalid File",
-          description: "Please upload an image file (JPG, PNG, etc.)",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      // Validate file size (max 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        toast({
-          title: "File Too Large",
-          description: "Please upload an image smaller than 5MB",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      // Read file and convert to base64
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        handlePersonalInfoChange('profilePhoto', reader.result);
-        toast({
-          title: "Image Uploaded",
-          description: "Profile photo added successfully",
-        });
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const removeProfilePhoto = () => {
-    handlePersonalInfoChange('profilePhoto', null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-    toast({
-      title: "Image Removed",
-      description: "Profile photo removed successfully",
-    });
   };
 
   const addExperience = () => {
@@ -161,6 +126,21 @@ const CreateCV = () => {
         skills: [...prev.skills, newSkill.trim()]
       }));
     }
+  };
+
+  const addProject = () => {
+    setCvData(prev => ({ ...prev, projects: [...(prev.projects || []), {
+      id: crypto.randomUUID(), name: '', techStack: '', link: '', description: ''
+    }] }));
+  };
+
+  const updateProject = (id, field, value) => {
+    setCvData(prev => ({ ...prev, projects: prev.projects.map(project =>
+      project.id === id ? { ...project, [field]: value } : project) }));
+  };
+
+  const removeProject = (id) => {
+    setCvData(prev => ({ ...prev, projects: prev.projects.filter(project => project.id !== id) }));
   };
 
   const removeSkill = (index) => {
@@ -372,6 +352,13 @@ const CreateCV = () => {
           const nameWidth = pdf.getTextWidth(name);
           pdf.text(name, (pageWidth - nameWidth) / 2, y);
           y += 6;
+          if (cvData.personalInfo.title?.trim()) {
+            pdf.setFontSize(10);
+            pdf.setFont('helvetica', 'normal');
+            const titleLines = pdf.splitTextToSize(cvData.personalInfo.title.trim(), contentWidth);
+            pdf.text(titleLines, pageWidth / 2, y, { align: 'center' });
+            y += titleLines.length * 4 + 1;
+          }
 
           // Contact line 1: location | phone | email
           pdf.setFontSize(9);
@@ -507,6 +494,13 @@ const CreateCV = () => {
         const nameWidth = pdf.getTextWidth(name);
         pdf.text(name, (pageWidth - nameWidth) / 2, y);
         y += 7;
+        if (cvData.personalInfo.title?.trim()) {
+          pdf.setFontSize(10);
+          pdf.setFont('helvetica', 'normal');
+          const titleLines = pdf.splitTextToSize(cvData.personalInfo.title.trim(), contentWidth);
+          pdf.text(titleLines, pageWidth / 2, y, { align: 'center' });
+          y += titleLines.length * 4 + 1;
+        }
 
         // Contact info line — centered, separated by |
         pdf.setFontSize(9);
@@ -695,59 +689,14 @@ const CreateCV = () => {
         }
 
         // ============================================================
-        // PROJECTS (if cvData has projects array)
+        // PROJECTS for both template fallbacks.
         // ============================================================
-        if (cvData.projects && cvData.projects.length > 0) {
-          sectionHeader('Projects');
-
-          for (const proj of cvData.projects) {
-            checkPageBreak(12);
-
-            // Project name bold + tech stack in italic
-            pdf.setFontSize(10);
-            pdf.setFont('helvetica', 'bold');
-            pdf.setTextColor(0, 0, 0);
-            const projName = proj.name || proj.title || '';
-            let projHeader = projName;
-            pdf.text(projHeader, marginLeft + 2, y);
-
-            // Tech stack in italic gray after the name
-            if (proj.techStack || proj.technologies) {
-              const tech = proj.techStack || proj.technologies;
-              const techStr = Array.isArray(tech) ? tech.join(', ') : tech;
-              const nameW = pdf.getTextWidth(projName + '  |  ');
-              pdf.setFont('helvetica', 'italic');
-              pdf.setTextColor(80, 80, 80);
-              pdf.setFontSize(9.5);
-              pdf.text(techStr, marginLeft + 2 + nameW, y);
-            }
-
-            // Date right-aligned if present
-            if (proj.date || proj.dates) {
-              pdf.setFont('helvetica', 'normal');
-              pdf.setTextColor(0, 0, 0);
-              pdf.setFontSize(9.5);
-              textRight(proj.date || proj.dates || '', y);
-            }
-            y += 4.5;
-
-            // Description bullets
-            pdf.setTextColor(0, 0, 0);
-            const projDesc = proj.description || '';
-            if (projDesc) {
-              const bullets = projDesc.split('\n').filter(b => b.trim());
-              for (const bullet of bullets) {
-                const cleanBullet = bullet.replace(/^[\s\-\u2022\u2023\u25E6\u2043*]+/, '').trim();
-                if (cleanBullet) {
-                  bulletItem(cleanBullet, 4);
-                }
-              }
-            }
-            y += 2;
-          }
-        }
-
         } // end else (modern template)
+
+        y = renderPdfProjects(pdf, cvData.projects || [], {
+          y, marginLeft, marginRight, marginTop, marginBottom,
+          sectionHeader: (title, startY) => { y = startY; sectionHeader(title); return y; },
+        });
 
         blob = pdf.output('blob');
       }
@@ -784,37 +733,39 @@ const CreateCV = () => {
 
 
   return (
-    <div className="min-h-screen bg-[#0a0a0b]">
+    <div className="cv-editor min-h-screen bg-[#0a0a0b] text-gray-200">
       <SEOHead
-        title="Create Your CV - CVCraft"
-        description="Build a professional, ATS-optimized resume with AI-powered suggestions. Choose from 6 templates and export as PDF."
+        title="Create Your CV - Veyfolio"
+        description="Build your resume with live preview, two professional templates, optional AI refinement, and PDF export."
         path="/create"
       />
       {/* Header */}
       <header className="border-b border-gray-800 bg-[#0a0a0b]/95 backdrop-blur-sm sticky top-0 z-50">
-        <div className="max-w-[1800px] mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
               <Button 
                 variant="ghost" 
                 size="sm" 
                 onClick={() => navigate('/')}
-                className="text-gray-400 hover:text-white"
+                aria-label="Back to home"
+                title="Back to home"
+                className="h-9 w-9 p-0 text-gray-400 hover:text-white hover:bg-gray-800"
               >
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back
+                <ArrowLeft className="w-4 h-4" />
               </Button>
               <div className="flex items-center gap-2">
-                <FileText className="w-6 h-6 text-[#0066ff]" />
-                <span className="text-xl font-bold text-white">CVCraft</span>
+                <img src="/veyfolio-logo.png" alt="" width="24" height="24" className="w-6 h-6 object-contain shrink-0" />
+                <span className="text-xl font-bold text-white">Veyfolio</span>
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex w-full sm:w-auto flex-wrap items-center gap-2 justify-between sm:justify-end">
               <AIToggle enabled={aiEnabled} onToggle={handleAIToggle} />
               <Button 
                 onClick={handleAIOptimize}
+                disabled={aiLoading || !aiEnabled}
                 variant="outline"
-                className="border-[#0066ff] text-[#0066ff] hover:bg-[#0066ff]/10"
+                className="h-9 bg-transparent border-gray-700 text-blue-300 hover:text-blue-200 hover:bg-gray-800 px-3"
               >
                 <Sparkles className="w-4 h-4 mr-2" />
                 {aiLoading ? 'Analyzing...' : 'AI Optimize'}
@@ -823,7 +774,7 @@ const CreateCV = () => {
               <Button 
                 onClick={handleDownloadPDF}
                 disabled={pdfLoading}
-                className="bg-[#0066ff] hover:bg-[#0052cc] text-white"
+                className="h-9 bg-[#0066ff] hover:bg-[#0052cc] text-white px-3"
               >
                 <Download className="w-4 h-4 mr-2" />
                 {pdfLoading ? 'Generating...' : 'Download PDF'}
@@ -834,10 +785,20 @@ const CreateCV = () => {
       </header>
 
       {/* Main Content */}
-      <div className="max-w-[1800px] mx-auto px-6 py-8">
-        <div className="grid lg:grid-cols-2 gap-8">
+      <main className="max-w-[1600px] mx-auto px-4 sm:px-6 py-6">
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+          <div>
+            <h1 className="text-xl font-semibold text-white">Resume workspace</h1>
+            <p className="text-sm text-gray-500 mt-1">{cvData.personalInfo.fullName || 'Untitled resume'} <span className="mx-2">/</span><span role="status">{saveStatus}</span></p>
+          </div>
+          <div className="lg:hidden flex bg-[#171719] border border-gray-700 rounded-lg p-1" aria-label="Workspace view">
+            <Button onClick={() => setEditorView('edit')} aria-pressed={editorView === 'edit'} className={`h-8 px-4 ${editorView === 'edit' ? 'bg-gray-700 text-white' : 'bg-transparent text-gray-400 hover:bg-gray-800'}`}><PenLine className="w-4 h-4 mr-2" />Edit</Button>
+            <Button onClick={() => setEditorView('preview')} aria-pressed={editorView === 'preview'} className={`h-8 px-4 ${editorView === 'preview' ? 'bg-gray-700 text-white' : 'bg-transparent text-gray-400 hover:bg-gray-800'}`}><Eye className="w-4 h-4 mr-2" />Preview</Button>
+          </div>
+        </div>
+        <div className="grid lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] gap-6 items-start">
           {/* Left Panel - Form */}
-          <div className="space-y-6">
+          <div className={`${editorView === 'edit' ? 'block' : 'hidden'} lg:block min-w-0 space-y-6`}>
             {showAISuggestions && (
               <Card className="bg-[#081018] border-blue-800 p-4 mb-4">
                 <div className="flex justify-between items-start">
@@ -855,67 +816,18 @@ const CreateCV = () => {
                 <pre className="whitespace-pre-wrap text-sm text-gray-200 mt-3">{aiSuggestion}</pre>
               </Card>
             )}
-            <Card className="bg-[#1a1a1c] border-gray-800 p-6">
+            <section className="bg-[#141416] border border-gray-800 rounded-lg p-4 sm:p-5" aria-label="Resume details">
               <Tabs value={activeTab} onValueChange={setActiveTab}>
-                <TabsList className="grid w-full grid-cols-4 bg-[#0f0f10]">
+                <TabsList className="cv-editor-tabs grid w-full grid-cols-3 sm:grid-cols-5 h-auto min-h-10 gap-1 bg-[#0b0b0d]">
                   <TabsTrigger value="personal">Personal</TabsTrigger>
                   <TabsTrigger value="experience">Experience</TabsTrigger>
                   <TabsTrigger value="education">Education</TabsTrigger>
                   <TabsTrigger value="skills">Skills</TabsTrigger>
+                  <TabsTrigger value="projects">Projects</TabsTrigger>
                 </TabsList>
 
                 {/* Personal Info Tab */}
                 <TabsContent value="personal" className="space-y-4 mt-6">
-                  {/* Profile Photo Upload */}
-                  <div className="space-y-2">
-                    <Label className="text-gray-300">Profile Photo</Label>
-                    <div className="flex items-center gap-4">
-                      {cvData.personalInfo.profilePhoto ? (
-                        <div className="relative">
-                          <img 
-                            src={cvData.personalInfo.profilePhoto} 
-                            alt="Profile" 
-                            className="w-24 h-24 rounded-full object-cover border-2 border-[#0066ff]"
-                          />
-                          <button
-                            onClick={removeProfilePhoto}
-                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="w-24 h-24 rounded-full bg-[#0f0f10] border-2 border-dashed border-gray-700 flex items-center justify-center">
-                          <Upload className="w-8 h-8 text-gray-500" />
-                        </div>
-                      )}
-                      <div className="flex-1">
-                        <input
-                          ref={fileInputRef}
-                          type="file"
-                          accept="image/*"
-                          onChange={handleImageUpload}
-                          className="hidden"
-                          id="photo-upload"
-                        />
-                        <label htmlFor="photo-upload">
-                          <Button 
-                            type="button"
-                            variant="outline"
-                            className="border-gray-700 text-gray-300 hover:text-white hover:border-[#0066ff] cursor-pointer"
-                            onClick={() => document.getElementById('photo-upload').click()}
-                          >
-                            <Upload className="w-4 h-4 mr-2" />
-                            {cvData.personalInfo.profilePhoto ? 'Change Photo' : 'Upload Photo'}
-                          </Button>
-                        </label>
-                        <p className="text-xs text-gray-500 mt-2">
-                          Recommended: Square image, max 5MB
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
                   <div className="space-y-2">
                     <Label className="text-gray-300">Full Name</Label>
                     <Input 
@@ -924,7 +836,7 @@ const CreateCV = () => {
                       className="bg-[#0f0f10] border-gray-700 text-white"
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label className="text-gray-300">Email</Label>
                       <Input 
@@ -951,7 +863,7 @@ const CreateCV = () => {
                       className="bg-[#0f0f10] border-gray-700 text-white"
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label className="text-gray-300">LinkedIn URL</Label>
                       <Input 
@@ -998,6 +910,8 @@ const CreateCV = () => {
                           variant="ghost" 
                           size="sm"
                           onClick={() => removeExperience(exp.id)}
+                          aria-label={`Remove experience ${index + 1}`}
+                          title="Remove experience"
                           className="text-red-400 hover:text-red-300 hover:bg-red-400/10"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -1028,7 +942,7 @@ const CreateCV = () => {
                             className="bg-[#1a1a1c] border-gray-700 text-white"
                           />
                         </div>
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid sm:grid-cols-2 gap-3">
                           <div className="space-y-2">
                             <Label className="text-gray-400 text-sm">Start Date</Label>
                             <Input 
@@ -1091,6 +1005,8 @@ const CreateCV = () => {
                           variant="ghost" 
                           size="sm"
                           onClick={() => removeEducation(edu.id)}
+                          aria-label={`Remove education ${index + 1}`}
+                          title="Remove education"
                           className="text-red-400 hover:text-red-300 hover:bg-red-400/10"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -1121,7 +1037,7 @@ const CreateCV = () => {
                             className="bg-[#1a1a1c] border-gray-700 text-white"
                           />
                         </div>
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid sm:grid-cols-2 gap-3">
                           <div className="space-y-2">
                             <Label className="text-gray-400 text-sm">Start Date</Label>
                             <Input 
@@ -1176,6 +1092,8 @@ const CreateCV = () => {
                           <span className="text-sm text-[#0066ff]">{skill}</span>
                           <button 
                             onClick={() => removeSkill(index)}
+                            aria-label={`Remove ${skill}`}
+                            title={`Remove ${skill}`}
                             className="text-[#0066ff] hover:text-red-400"
                           >
                             <Trash2 className="w-3 h-3" />
@@ -1193,27 +1111,58 @@ const CreateCV = () => {
                     </Button>
                   </div>
                 </TabsContent>
+                <TabsContent value="projects" className="space-y-4 mt-6">
+                  {(cvData.projects || []).map((project, index) => (
+                    <Card key={project.id} className="bg-[#0f0f10] border-gray-700 p-4">
+                      <div className="flex justify-between items-center mb-4">
+                        <h4 className="text-white font-semibold">Project {index + 1}</h4>
+                        <Button variant="ghost" size="sm" onClick={() => removeProject(project.id)} aria-label={`Remove project ${index + 1}`} title="Remove project" className="text-red-400 hover:bg-red-400/10"><Trash2 className="w-4 h-4" /></Button>
+                      </div>
+                      <div className="space-y-3">
+                        {[
+                          ['name', 'Project Name'], ['techStack', 'Technologies'], ['link', 'Project Link'],
+                        ].map(([field, label]) => (
+                          <div key={field} className="space-y-2">
+                            <Label htmlFor={`project-${project.id}-${field}`} className="text-gray-300">{label}</Label>
+                            <Input id={`project-${project.id}-${field}`} value={project[field]} onChange={e => updateProject(project.id, field, e.target.value)} className="bg-[#1a1a1c] border-gray-700 text-white" />
+                          </div>
+                        ))}
+                        <div className="space-y-2">
+                          <Label htmlFor={`project-${project.id}-description`} className="text-gray-300">Description</Label>
+                          <Textarea id={`project-${project.id}-description`} value={project.description} onChange={e => updateProject(project.id, 'description', e.target.value)} rows={4} className="bg-[#1a1a1c] border-gray-700 text-white" />
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                  <Button onClick={addProject} variant="outline" className="w-full bg-transparent border-dashed border-gray-700 text-gray-300 hover:bg-gray-800 hover:text-white"><Plus className="w-4 h-4 mr-2" />Add Project</Button>
+                </TabsContent>
               </Tabs>
-            </Card>
+            </section>
 
             {/* Template Selection */}
-            <Card className="bg-[#1a1a1c] border-gray-800 p-6">
+            <section className="border-t border-gray-800 pt-5" aria-label="Resume templates">
               <h3 className="text-white font-semibold mb-4">Choose Template</h3>
               <TemplateSelector selected={selectedTemplate} onSelect={setSelectedTemplate} />
-            </Card>
+            </section>
             <div className="mt-6">
-              <ATSScorePanel cvText={`${cvData.personalInfo.summary || ''}\n${(cvData.experience||[]).map(e=>e.description).join('\n')}`} />
+              <ATSScorePanel cvText={resumeToText(cvData)} />
             </div>
           </div>
 
           {/* Right Panel - Preview */}
-          <div className="lg:sticky lg:top-24 h-fit">
-            <div className="cv-preview-content">
+          <div className={`${editorView === 'preview' ? 'block' : 'hidden'} lg:block min-w-0 lg:sticky lg:top-24 h-fit`}>
+            <div className="flex items-center justify-between mb-3 gap-3">
+              <h2 className="text-sm font-semibold text-gray-300">Resume preview</h2>
+              <span className="inline-flex items-center gap-2 text-xs text-emerald-300"><span className="w-1.5 h-1.5 rounded-full bg-emerald-300" />Live</span>
+            </div>
+            <div className="overflow-x-auto border border-gray-700 rounded-lg bg-[#1a1a1c] p-2 sm:p-3">
+            <div className="cv-preview-content min-w-[560px]">
               <CVPreview cvData={cvData} template={selectedTemplate} />
+            </div>
             </div>
           </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 };

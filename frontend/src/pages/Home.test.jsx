@@ -1,5 +1,5 @@
 import { createRoot } from 'react-dom/client';
-import { act } from 'react-dom/test-utils';
+import { act } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import Home from './Home';
 
@@ -39,10 +39,11 @@ describe('Home page - JSON-LD structured data', () => {
     const data = JSON.parse(script.textContent);
     expect(data['@context']).toBe('https://schema.org');
     expect(data['@type']).toBe('WebApplication');
-    expect(data['name']).toBe('CVCraft');
+    expect(data['name']).toBe('Veyfolio');
     expect(data['description']).toBe('AI-powered professional resume builder');
-    expect(data['url']).toBe('https://cvcraft.app');
     expect(data['applicationCategory']).toBe('BusinessApplication');
+    expect(container.querySelectorAll('a[href="/create"]').length).toBeGreaterThanOrEqual(4);
+    expect(container.querySelector('a[href="#"]')).toBeNull();
   });
 
   it('removes JSON-LD script tag on unmount', () => {

@@ -10,7 +10,6 @@ export const mockLinkedInData = {
     portfolio: 'sarahjohnson.dev',
     title: 'Senior Product Manager',
     summary: 'Results-driven Product Manager with 8+ years of experience leading cross-functional teams to deliver innovative digital products. Proven track record of increasing user engagement by 150% and revenue by $2M annually.',
-    profilePhoto: null
   },
   experience: [
     {

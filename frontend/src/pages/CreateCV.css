@@ -1,0 +1,26 @@
+.cv-editor input:not([type="checkbox"]),
+.cv-editor textarea {
+  min-width: 0;
+  width: 100%;
+}
+
+.cv-editor-tabs [role="tab"] {
+  min-width: 0;
+  min-height: 32px;
+  padding-left: 4px;
+  padding-right: 4px;
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.cv-editor-tabs [role="tab"][data-state="active"] {
+  background: #303036;
+  color: #ffffff;
+}
+
+.cv-editor button:focus-visible,
+.cv-editor input:focus-visible,
+.cv-editor textarea:focus-visible {
+  outline: 2px solid #60a5fa;
+  outline-offset: 2px;
+}

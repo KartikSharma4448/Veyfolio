@@ -1,0 +1,2 @@
+hypothesis>=6.0
+pytest-asyncio>=0.23

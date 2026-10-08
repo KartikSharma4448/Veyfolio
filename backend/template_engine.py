@@ -55,7 +55,27 @@ def render_template(cv: Dict[str, Any], template: str = "modern") -> str:
         "executive": _render_executive,
         "tech": _render_tech,
     }
-    return dispatch[template](escaped)
+    document = dispatch[template](escaped)
+    projects = escaped["projects"]
+    if projects:
+        lines = [r"\section*{Projects}"]
+        for project in projects:
+            if not any(project.values()):
+                continue
+            if project["name"]:
+                lines.append(r"\noindent\textbf{" + project["name"] + r"}\par")
+            if project["techStack"]:
+                lines.append(r"\noindent\textit{" + project["techStack"] + r"}\par")
+            if project["link"]:
+                lines.append(r"\noindent " + project["link"] + r"\par")
+            bullets = [line.strip() for line in project["description"].splitlines() if line.strip()]
+            if bullets:
+                lines.append(r"\begin{itemize}")
+                for bullet in bullets:
+                    lines.append(r"\item " + bullet.lstrip(" -*\u2022"))
+                lines.append(r"\end{itemize}")
+        document = document.replace(r"\end{document}", "\n".join(lines) + "\n" + r"\end{document}")
+    return document
 
 
 def _escape_cv_data(cv: Dict[str, Any]) -> Dict[str, Any]:
@@ -98,6 +118,10 @@ def _escape_cv_data(cv: Dict[str, Any]) -> Dict[str, Any]:
         "experience": escaped_exp,
         "education": escaped_edu,
         "skills": escaped_skills,
+        "projects": [{key: escape_latex(project.get(key, ""))
+                      for key in ("name", "techStack", "link", "description")}
+                     for project in cv.get("projects", [])
+                     if any(project.get(key) for key in ("name", "techStack", "link", "description"))],
     }
 
 

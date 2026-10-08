@@ -18,6 +18,12 @@ node_modules/
 
 # Testing
 /coverage
+coverage/
+.pytest_cache/
+.hypothesis/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
 
 # Next.js
 /.next/
@@ -27,12 +33,14 @@ next-env.d.ts
 
 # Production builds
 /build
+build/
 dist/
 dist
 
 # Environment files (comprehensive coverage)
 .env
 .env.*
+!.env.example
 .env.local
 .env.development
 .env.production
@@ -89,5 +97,7 @@ test_result.md
 
 # Mobile development
 android-sdk/ frontend/node_modules/.cache/default-development/4.pack
+Thumbs.db
+Desktop.ini
 frontend/node_modules/.cache/default-development/4.pack
 frontend/node_modules/.cache/default-development/0.pack

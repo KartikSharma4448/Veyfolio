@@ -33,6 +33,7 @@ function ModernTemplate({ cvData, formatDate }) {
         <h1 className="text-[22px] font-bold tracking-tight">
           {cvData.personalInfo.fullName}
         </h1>
+        {cvData.personalInfo.title?.trim() && <p className="text-[11px] text-gray-800 mt-1 break-words">{cvData.personalInfo.title}</p>}
         <div className="text-[9px] text-gray-700 mt-1 flex flex-wrap justify-center gap-x-1">
           {[
             cvData.personalInfo.phone,
@@ -154,6 +155,7 @@ function ModernTemplate({ cvData, formatDate }) {
           </div>
         </div>
       )}
+      <ProjectsSection projects={cvData.projects} />
     </div>
   );
 }
@@ -171,6 +173,7 @@ function CleanTemplate({ cvData, formatDate }) {
         <h1 className="text-[24px] font-bold uppercase tracking-wide">
           {cvData.personalInfo.fullName}
         </h1>
+        {cvData.personalInfo.title?.trim() && <p className="text-[11px] text-gray-800 mt-1 break-words">{cvData.personalInfo.title}</p>}
         <div className="text-[9px] text-gray-700 mt-1.5">
           {[
             cvData.personalInfo.location,
@@ -298,6 +301,30 @@ function CleanTemplate({ cvData, formatDate }) {
           </div>
         </div>
       )}
+      <ProjectsSection projects={cvData.projects} clean />
+    </div>
+  );
+}
+
+function ProjectsSection({ projects = [], clean = false }) {
+  const entries = projects.filter(p => [p.name, p.techStack, p.link, p.description].some(value => value?.trim()));
+  if (!entries.length) return null;
+  const Header = clean ? CleanSectionHeader : SectionHeader;
+  return (
+    <div className="mt-4">
+      <Header title="Projects" />
+      <div className="space-y-3">
+        {entries.map(project => (
+          <div key={project.id} className="break-words">
+            <p className="text-[10px] font-bold">{project.name}</p>
+            {project.techStack && <p className="text-[9.5px] text-gray-700 italic">{project.techStack}</p>}
+            {project.link && <p className="text-[9px] text-gray-700 break-all">{project.link}</p>}
+            {project.description && <ul className="list-disc ml-3 mt-1 space-y-0.5 text-[9.5px]">
+              {project.description.split('\n').filter(line => line.trim()).map((line, index) => <li key={index}>{line.replace(/^[\s\-*\u2022]+/, '')}</li>)}
+            </ul>}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
