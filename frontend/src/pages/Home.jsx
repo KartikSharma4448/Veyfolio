@@ -3,15 +3,7 @@ import { Link } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { FileText, Sparkles, Download, ArrowRight, CheckCircle2, TrendingUp } from 'lucide-react';
 import SEOHead from '../components/SEOHead';
-const HOME_TITLE = 'Veyfolio - AI-Powered Professional Resume Builder';
-const HOME_DESCRIPTION = 'Build your resume with a live preview, two professional templates, optional AI suggestions, and job-description keyword scoring.';
-const HOME_SCHEMA = {
-  '@context': 'https://schema.org',
-  '@type': 'WebApplication',
-  name: 'Veyfolio',
-  description: 'AI-powered professional resume builder',
-  applicationCategory: 'BusinessApplication',
-};
+import { HOME_TITLE, HOME_DESCRIPTION, HOME_SCHEMA } from '../seoConfig';
 
 const Home = () => {
 

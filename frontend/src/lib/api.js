@@ -28,14 +28,6 @@ export async function makeLatex(cv, template = 'modern') {
   return postJson('/api/ai/latex', { cv, template });
 }
 
-export async function signup(email) {
-  return postJson('/api/auth/signup', { email });
-}
-
-export async function verifyToken(token) {
-  return postJson('/api/auth/verify', { token });
-}
-
 export async function embedTexts(texts) {
   return postJson('/api/ai/embed', { texts });
 }

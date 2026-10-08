@@ -42,7 +42,7 @@ Screenshots use fictional sample resume data.
 - **Two templates:** ATS Professional and ATS Clean layouts.
 - **Projects:** project names, technologies, links and descriptions.
 - **Local autosave:** drafts and template choice persist in this browser.
-- **PDF export:** browser export, with optional server-side LaTeX compilation.
+- **PDF export:** selectable text with the same layout and page breaks as the live preview.
 - **Job keyword checks:** review matched/missing terms against a job description.
 - **Optional AI refinement:** wording suggestions when provider credentials are configured.
 - **Responsive workspace:** separate editing and preview views on mobile.
@@ -56,7 +56,7 @@ Local drafts are not cloud backups; clearing browser storage can delete them.
 | --- | --- |
 | Frontend | React 18, React Router, Tailwind CSS, Radix UI, jsPDF |
 | Backend | Python, FastAPI, Pydantic, HTTPX |
-| Services | MongoDB; optional Redis and NVIDIA inference APIs |
+| Services | Optional Redis and NVIDIA inference APIs; no database required |
 | Tests | Jest, fast-check, pytest, Hypothesis |
 
 ## Getting Started
@@ -65,7 +65,6 @@ Local drafts are not cloud backups; clearing browser storage can delete them.
 
 - Node.js 20+ and npm; use a supported LTS release.
 - Python 3.11 or 3.12.
-- MongoDB for database-backed endpoints.
 - Optional Redis for shared caching and rate limits.
 - Optional `pdflatex` and TeX packages for server PDF compilation.
 
@@ -103,21 +102,23 @@ python -m pip install -r requirements.txt
 python -m pip install -r requirements-dev.txt
 ```
 
-Copy `backend/.env.example` to `backend/.env`, configure MongoDB and start:
+Copy `backend/.env.example` to `backend/.env`, configure allowed frontend origins and start:
 
 ```bash
 python -m uvicorn server:app --host 127.0.0.1 --port 8000 --reload
 ```
 
 API documentation: [localhost:8000/docs](http://localhost:8000/docs).
-`GET /api/` confirms the API responds, not that MongoDB or providers are connected.
+`GET /api/` confirms the API responds, not that external providers are connected.
+Resume drafts stay in browser storage. Legacy database status and signup routes
+have been removed; database credentials are no longer required.
 
 ## Configuration
 
 | Variable | Purpose |
 | --- | --- |
 | `REACT_APP_BACKEND_URL` | Frontend API origin |
-| `MONGO_URL`, `DB_NAME` | Backend database configuration |
+| `REACT_APP_SITE_URL` | Canonical public origin; defaults to `https://veyfolio.thekartiksharma.in` |
 | `CORS_ORIGINS` | Comma-separated allowed frontend origins |
 | `GEMMA_API_KEY` | Optional AI refinement |
 | `EMBED_API_KEY`, `RERANK_API_KEY` | Optional semantic matching |
@@ -141,8 +142,12 @@ python -m pytest tests -v
 ```
 
 Frontend output: `frontend/build`. AI refinement needs valid provider keys;
-keyword scoring has a heuristic fallback. Server PDF compilation needs TeX;
-the editor can fall back to browser PDF export.
+keyword scoring has a heuristic fallback. The editor previews and downloads one
+shared browser PDF layout. The separate server compilation API still needs TeX.
+
+Production builds prerender the homepage and generate `robots.txt`, `sitemap.xml`
+and editor noindex metadata. See [SEO deployment notes](docs/SEO.md) for the
+required Render route rewrites and post-deployment checks.
 
 ## Project Layout
 

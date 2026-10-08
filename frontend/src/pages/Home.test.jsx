@@ -2,6 +2,7 @@ import { createRoot } from 'react-dom/client';
 import { act } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import Home from './Home';
+import { SITE_URL, HOME_DESCRIPTION } from '../seoConfig';
 
 let container = null;
 let root = null;
@@ -40,7 +41,8 @@ describe('Home page - JSON-LD structured data', () => {
     expect(data['@context']).toBe('https://schema.org');
     expect(data['@type']).toBe('WebApplication');
     expect(data['name']).toBe('Veyfolio');
-    expect(data['description']).toBe('AI-powered professional resume builder');
+    expect(data['description']).toBe(HOME_DESCRIPTION);
+    expect(data['url']).toBe(`${SITE_URL}/`);
     expect(data['applicationCategory']).toBe('BusinessApplication');
     expect(container.querySelectorAll('a[href="/create"]').length).toBeGreaterThanOrEqual(4);
     expect(container.querySelector('a[href="#"]')).toBeNull();

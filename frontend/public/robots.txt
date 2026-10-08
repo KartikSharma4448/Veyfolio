@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://veyfolio.thekartiksharma.in/sitemap.xml

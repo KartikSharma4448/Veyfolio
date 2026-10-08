@@ -27,22 +27,6 @@ from server import app as real_app
 # --- Hypothesis Strategies ---
 
 @composite
-def client_name_strategy(draw):
-    """Generate valid client_name strings (non-empty)."""
-    name = draw(text(min_size=1, max_size=100))
-    # Ensure it's not just whitespace
-    assume(name.strip())
-    return name
-
-
-@composite
-def status_create_payload(draw):
-    """Generate valid StatusCheckCreate payloads."""
-    name = draw(client_name_strategy())
-    return {"client_name": name}
-
-
-@composite
 def latex_request_payload(draw):
     """Generate valid LatexRequest payloads conforming to existing schema."""
     templates = ["modern", "traditional", "creative", "minimalist", "executive", "tech"]
@@ -117,48 +101,16 @@ def _mock_redis():
     return mock_redis
 
 
-def _mock_db_collection():
-    """Create a mock MongoDB collection."""
-    mock_col = MagicMock()
-    mock_col.insert_one = AsyncMock(return_value=MagicMock(inserted_id="test_id"))
-    mock_col.find = MagicMock(return_value=MagicMock(to_list=AsyncMock(return_value=[])))
-    mock_col.find_one = AsyncMock(return_value=None)
-    return mock_col
-
-
 class TestBackwardCompatibleEndpoints:
     """Property 13: Backward-compatible endpoints accept existing payloads."""
 
     @pytest.mark.asyncio
-    @given(payload=status_create_payload())
-    @settings(max_examples=50)
-    async def test_post_status_accepts_existing_payload(self, payload: dict):
-        """POST /api/status accepts existing StatusCheckCreate payloads
-        and returns HTTP 2xx with expected response structure.
-
-        **Validates: Requirements 8.2**
-        """
-        mock_redis = _mock_redis()
-        mock_col = _mock_db_collection()
-
-        with patch("redis_client.get_redis", return_value=mock_redis), \
-             patch("limits.get_redis", return_value=mock_redis), \
-             patch("server.db") as mock_db:
-            mock_db.status_checks = mock_col
-
-            transport = ASGITransport(app=real_app)
-            async with AsyncClient(transport=transport, base_url="http://test") as client:
-                response = await client.post("/api/status", json=payload)
-
-        assert 200 <= response.status_code < 300, (
-            f"POST /api/status returned {response.status_code} for payload {payload!r}.\n"
-            f"Response: {response.text}"
-        )
-        data = response.json()
-        # Existing response structure: id, client_name, timestamp
-        assert "id" in data, f"Response missing 'id' field: {data}"
-        assert "client_name" in data, f"Response missing 'client_name' field: {data}"
-        assert "timestamp" in data, f"Response missing 'timestamp' field: {data}"
+    async def test_post_status_accepts_existing_payload(self):
+        """Database-only status routes are intentionally retired."""
+        transport = ASGITransport(app=real_app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.post("/api/status", json={"client_name": "retired"})
+        assert response.status_code == 404
 
     @pytest.mark.asyncio
     async def test_get_root_returns_2xx(self):
@@ -183,28 +135,11 @@ class TestBackwardCompatibleEndpoints:
 
     @pytest.mark.asyncio
     async def test_get_status_returns_2xx(self):
-        """GET /api/status returns HTTP 2xx with list response structure.
-
-        **Validates: Requirements 8.2**
-        """
-        mock_redis = _mock_redis()
-        mock_col = _mock_db_collection()
-
-        with patch("redis_client.get_redis", return_value=mock_redis), \
-             patch("limits.get_redis", return_value=mock_redis), \
-             patch("server.db") as mock_db:
-            mock_db.status_checks = mock_col
-
-            transport = ASGITransport(app=real_app)
-            async with AsyncClient(transport=transport, base_url="http://test") as client:
-                response = await client.get("/api/status")
-
-        assert 200 <= response.status_code < 300, (
-            f"GET /api/status returned {response.status_code}.\n"
-            f"Response: {response.text}"
-        )
-        data = response.json()
-        assert isinstance(data, list), f"Expected list response, got {type(data)}: {data}"
+        """Database-only status routes are intentionally retired."""
+        transport = ASGITransport(app=real_app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.get("/api/status")
+        assert response.status_code == 404
 
     @pytest.mark.asyncio
     @given(payload=latex_request_payload())

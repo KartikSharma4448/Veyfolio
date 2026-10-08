@@ -1,6 +1,6 @@
 """Integration tests for end-to-end API flows.
 
-Tests the full FastAPI application with mocked external services (Redis, MongoDB,
+Tests the full FastAPI application with mocked external services (Redis,
 NVIDIA API) to verify:
 - Refine endpoint returns valid response structure
 - PDF compile endpoint returns PDF content-type on valid input
@@ -37,18 +37,6 @@ def _mock_redis():
     mock_redis.keys = AsyncMock(return_value=[])
     mock_redis.hincrby = AsyncMock(return_value=1)
     return mock_redis
-
-
-def _mock_db_collection():
-    """Create a mock MongoDB collection."""
-    mock_col = MagicMock()
-    mock_col.insert_one = AsyncMock(return_value=MagicMock(inserted_id="test_id"))
-    mock_col.find = MagicMock(return_value=MagicMock(to_list=AsyncMock(return_value=[])))
-    mock_col.find_one = AsyncMock(return_value=None)
-    return mock_col
-
-
-# --- Fixtures ---
 
 
 @pytest.fixture
@@ -499,51 +487,19 @@ class TestExistingEndpointsIntegration:
 
     @pytest.mark.asyncio
     async def test_post_status_endpoint(self):
-        """POST /api/status creates a status check with original payload format.
-
-        Validates: Requirements 8.2
-        """
-        mock_redis = _mock_redis()
-        mock_col = _mock_db_collection()
-        payload = {"client_name": "integration-test-client"}
-
-        with patch("redis_client.get_redis", return_value=mock_redis), \
-             patch("limits.get_redis", return_value=mock_redis), \
-             patch("server.db") as mock_db:
-            mock_db.status_checks = mock_col
-
-            transport = ASGITransport(app=real_app)
-            async with AsyncClient(transport=transport, base_url="http://test") as client:
-                response = await client.post("/api/status", json=payload)
-
-        assert response.status_code == 200
-        data = response.json()
-        assert "id" in data
-        assert "client_name" in data
-        assert data["client_name"] == "integration-test-client"
-        assert "timestamp" in data
+        """Database-only status routes are intentionally retired."""
+        transport = ASGITransport(app=real_app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.post("/api/status", json={"client_name": "retired"})
+        assert response.status_code == 404
 
     @pytest.mark.asyncio
     async def test_get_status_endpoint(self):
-        """GET /api/status returns list of status checks.
-
-        Validates: Requirements 8.2
-        """
-        mock_redis = _mock_redis()
-        mock_col = _mock_db_collection()
-
-        with patch("redis_client.get_redis", return_value=mock_redis), \
-             patch("limits.get_redis", return_value=mock_redis), \
-             patch("server.db") as mock_db:
-            mock_db.status_checks = mock_col
-
-            transport = ASGITransport(app=real_app)
-            async with AsyncClient(transport=transport, base_url="http://test") as client:
-                response = await client.get("/api/status")
-
-        assert response.status_code == 200
-        data = response.json()
-        assert isinstance(data, list)
+        """Database-only status routes are intentionally retired."""
+        transport = ASGITransport(app=real_app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.get("/api/status")
+        assert response.status_code == 404
 
     @pytest.mark.asyncio
     async def test_post_ai_latex_endpoint(self):

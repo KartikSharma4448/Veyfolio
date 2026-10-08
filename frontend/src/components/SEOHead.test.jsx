@@ -1,6 +1,7 @@
 import { createRoot } from 'react-dom/client';
-import { act } from 'react-dom/test-utils';
+import { act } from 'react';
 import SEOHead from './SEOHead';
+import { SITE_URL, SOCIAL_IMAGE } from '../seoConfig';
 
 let container = null;
 let root = null;
@@ -54,8 +55,8 @@ describe('SEOHead', () => {
     });
     expect(document.querySelector('meta[property="og:title"]').getAttribute('content')).toBe('CVCraft');
     expect(document.querySelector('meta[property="og:description"]').getAttribute('content')).toBe('Build resumes');
-    expect(document.querySelector('meta[property="og:url"]').getAttribute('content')).toBe('https://cvcraft.app/create');
-    expect(document.querySelector('meta[property="og:image"]').getAttribute('content')).toBe('https://cvcraft.app/og-image.png');
+    expect(document.querySelector('meta[property="og:url"]').getAttribute('content')).toBe(`${SITE_URL}/create`);
+    expect(document.querySelector('meta[property="og:image"]').getAttribute('content')).toBe(SOCIAL_IMAGE);
   });
 
   it('sets Twitter Card meta tags', () => {
@@ -65,7 +66,7 @@ describe('SEOHead', () => {
     expect(document.querySelector('meta[name="twitter:card"]').getAttribute('content')).toBe('summary_large_image');
     expect(document.querySelector('meta[name="twitter:title"]').getAttribute('content')).toBe('CVCraft');
     expect(document.querySelector('meta[name="twitter:description"]').getAttribute('content')).toBe('Build resumes');
-    expect(document.querySelector('meta[name="twitter:image"]').getAttribute('content')).toBe('https://cvcraft.app/og-image.png');
+    expect(document.querySelector('meta[name="twitter:image"]').getAttribute('content')).toBe(SOCIAL_IMAGE);
   });
 
   it('updates meta tags when props change', () => {
@@ -79,7 +80,13 @@ describe('SEOHead', () => {
     });
     expect(document.title).toBe('Page 2');
     expect(document.querySelector('meta[name="description"]').getAttribute('content')).toBe('Second page');
-    expect(document.querySelector('meta[property="og:url"]').getAttribute('content')).toBe('https://cvcraft.app/create');
+    expect(document.querySelector('meta[property="og:url"]').getAttribute('content')).toBe(`${SITE_URL}/create`);
+    expect(document.querySelector('meta[name="robots"]').content).toBe('noindex, follow');
+    expect(document.querySelectorAll('link[rel="canonical"]')).toHaveLength(1);
+    expect(document.querySelector('link[rel="canonical"]').href).toBe(`${SITE_URL}/create`);
+    act(() => root.render(<SEOHead title="Home" description="Home" path="/" />));
+    expect(document.querySelector('meta[name="robots"]').content).toBe('index, follow, max-image-preview:large');
+    expect(document.querySelectorAll('link[rel="canonical"]')).toHaveLength(1);
   });
 
   it('renders nothing (returns null)', () => {

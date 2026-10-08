@@ -9,10 +9,10 @@ const cvData = {
 
 it.each(['modern', 'clean'])('renders title and project details in %s preview', template => {
   const html = renderToStaticMarkup(<CVPreview cvData={cvData} template={template} />);
-  for (const text of ['Frontend Engineer', 'Projects', 'Travel App', 'React', 'https://example.com', 'Built trip search', 'Added filters']) expect(html).toContain(text);
+  for (const text of ['Frontend Engineer', 'PROJECTS', 'Travel App', 'React', 'https://example.com', 'Built trip search', 'Added filters']) expect(html).toContain(text);
 });
 
 it('omits a completely empty project entry', () => {
   const html = renderToStaticMarkup(<CVPreview cvData={{ ...cvData, projects: [{ id: 'empty', name: '', description: '' }] }} template="modern" />);
-  expect(html).not.toContain('Projects');
+  expect(html).not.toContain('PROJECTS');
 });
